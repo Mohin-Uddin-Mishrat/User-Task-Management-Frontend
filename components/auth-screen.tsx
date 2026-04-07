@@ -1,17 +1,26 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { extractTokenFromResponse, persistAuthToken } from "@/lib/auth-token";
 import { useLoginMutation } from "@/redux/api/authApi";
-import { useAppDispatch, useAppSelector } from "@/redux/hooks";
-import { logoutLocal } from "@/redux/features/auth/authSlice";
+import { useAppSelector } from "@/redux/hooks";
 
 export function AuthScreen() {
+  const router = useRouter();
   const [email, setEmail] = useState("user@example.com");
   const [password, setPassword] = useState("123456");
   const [feedback, setFeedback] = useState<string | null>(null);
-  const dispatch = useAppDispatch();
-  const { isAuthenticated, userEmail } = useAppSelector((state) => state.auth);
+  const { isAuthenticated, isHydrated, role } = useAppSelector((state) => state.auth);
   const [login, { isLoading: isLoggingIn }] = useLoginMutation();
+
+  useEffect(() => {
+    if (!isHydrated || !isAuthenticated) {
+      return;
+    }
+
+    router.replace(role === "ADMIN" ? "/admin" : "/user");
+  }, [isAuthenticated, isHydrated, role, router]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -19,7 +28,22 @@ export function AuthScreen() {
 
     try {
       const response = await login({ email, password }).unwrap();
-      setFeedback(response.message ?? "Login successful.");
+      const token = extractTokenFromResponse(response);
+      const nextRole =
+        response.role ??
+        response.user?.role ??
+        response.data?.role ??
+        response.data?.user?.role ??
+        "USER";
+
+      if (token) {
+        persistAuthToken(token);
+      }
+
+      setFeedback(
+        response.message ??
+          `Login successful. Redirecting to the ${nextRole.toLowerCase()} dashboard...`,
+      );
     } catch (error) {
       const message =
         typeof error === "object" &&
@@ -36,15 +60,28 @@ export function AuthScreen() {
     }
   }
 
-  function handleLogout() {
-    setFeedback(null);
-    dispatch(logoutLocal());
-    setFeedback("Local auth state cleared.");
+  if (!isHydrated) {
+    return (
+      <section className="w-full max-w-md rounded-[28px] border border-black/10 bg-white p-8 shadow-[0_20px_80px_rgba(15,23,42,0.10)]">
+        <p className="text-sm text-slate-500">Checking your session...</p>
+      </section>
+    );
   }
 
   return (
     <section className="w-full max-w-md rounded-[28px] border border-black/10 bg-white p-8 shadow-[0_20px_80px_rgba(15,23,42,0.10)]">
-
+      <div>
+        <p className="text-sm font-medium uppercase tracking-[0.28em] text-sky-600">
+          Task Management
+        </p>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+          Sign in to continue
+        </h1>
+        <p className="mt-3 text-sm leading-6 text-slate-500">
+          Users go to the user dashboard and admins land in the admin dashboard
+          automatically after login.
+        </p>
+      </div>
 
       <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
         <label className="block">
@@ -96,6 +133,8 @@ export function AuthScreen() {
       ) : null}
 
       <p className="mt-4 text-xs leading-5 text-slate-500">
+        Use an admin account to open the admin routes, or a regular user account
+        to open the user dashboard.
       </p>
     </section>
   );

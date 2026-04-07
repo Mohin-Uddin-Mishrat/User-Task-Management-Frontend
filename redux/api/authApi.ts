@@ -1,4 +1,6 @@
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import { createApi } from "@reduxjs/toolkit/query/react";
+import { createBaseQuery } from "./baseQuery";
+import { getApiBaseUrl } from "./apiBaseUrl";
 
 export type LoginRequest = {
   email: string;
@@ -7,21 +9,40 @@ export type LoginRequest = {
 
 export type LoginResponse = {
   message?: string;
+  token?: string;
+  accessToken?: string;
+  role?: string;
+  user?: {
+    role?: string;
+    email?: string;
+  };
+  data?: {
+    token?: string;
+    accessToken?: string;
+    role?: string;
+    user?: {
+      role?: string;
+      email?: string;
+    };
+  };
 };
 
-function getApiBaseUrl() {
-  return (
-    process.env.NEXT_PUBLIC_BACKEND_URL ??
-    process.env.NEXT_PUBLIC_BACKENR_URL ??
-    "https://task-management-9epb.onrender.com"
-  );
-}
+export type UserOption = {
+  id: string;
+  name: string;
+};
+
+export type GetUsersResponse = {
+  statusCode: number;
+  success: boolean;
+  message: string;
+  data: UserOption[];
+};
 
 export const authApi = createApi({
   reducerPath: "authApi",
-  baseQuery: fetchBaseQuery({
+  baseQuery: createBaseQuery({
     baseUrl: `${getApiBaseUrl()}/api/v1/auth`,
-    credentials: "include",
   }),
   endpoints: (builder) => ({
     login: builder.mutation<LoginResponse, LoginRequest>({
@@ -31,7 +52,12 @@ export const authApi = createApi({
         body,
       }),
     }),
+    getUsers: builder.query<GetUsersResponse, void>({
+      query: () => ({
+        url: "/users",
+      }),
+    }),
   }),
 });
 
-export const { useLoginMutation } = authApi;
+export const { useGetUsersQuery, useLoginMutation } = authApi;

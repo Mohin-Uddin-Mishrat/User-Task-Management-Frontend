@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { getApiMessage } from "@/lib/api";
 import {
   TaskRecord,
   TaskStatus,
@@ -9,18 +10,6 @@ import {
 } from "@/redux/api/tasksApi";
 
 type DraftStatuses = Record<string, NonNullable<TaskStatus>>;
-
-function getErrorMessage(error: unknown, fallback: string) {
-  return typeof error === "object" &&
-    error !== null &&
-    "data" in error &&
-    typeof error.data === "object" &&
-    error.data !== null &&
-    "message" in error.data &&
-    typeof error.data.message === "string"
-    ? error.data.message
-    : fallback;
-}
 
 function getTaskStatus(task: TaskRecord): NonNullable<TaskStatus> {
   return task.status ?? "TODO";
@@ -39,26 +28,18 @@ export function MyTasksTable() {
   const tasks = data?.data.data ?? [];
   const meta = data?.data.meta;
 
-  function getSelectedStatus(task: TaskRecord) {
-    return draftStatuses[task.id] ?? getTaskStatus(task);
-  }
-
   async function handleStatusUpdate(
     taskId: string,
-    nextStatus: NonNullable<TaskStatus>,
+    status: NonNullable<TaskStatus>,
   ) {
     setFeedback(null);
     setDraftStatuses((current) => ({
       ...current,
-      [taskId]: nextStatus,
+      [taskId]: status,
     }));
 
     try {
-      const response = await updateTaskStatus({
-        id: taskId,
-        status: nextStatus,
-      }).unwrap();
-
+      const response = await updateTaskStatus({ id: taskId, status }).unwrap();
       setFeedback(response.message ?? "Task status updated successfully.");
       setDraftStatuses((current) => {
         const nextDrafts = { ...current };
@@ -66,7 +47,7 @@ export function MyTasksTable() {
         return nextDrafts;
       });
     } catch (error) {
-      setFeedback(getErrorMessage(error, "Task status update failed."));
+      setFeedback(getApiMessage(error, "Task status update failed."));
     }
   }
 
@@ -140,40 +121,36 @@ export function MyTasksTable() {
                   </td>
                 </tr>
               ) : (
-                tasks.map((task) => {
-                  const selectedStatus = getSelectedStatus(task);
-
-                  return (
-                    <tr key={task.id}>
-                      <td className="px-6 py-4 text-sm font-medium text-slate-900">
-                        {task.title}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-slate-700">
-                        <select
-                          value={selectedStatus}
-                          onChange={(event) =>
-                            handleStatusUpdate(
-                              task.id,
-                              event.target.value as NonNullable<TaskStatus>,
-                            )
-                          }
-                          disabled={isUpdating}
-                          className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-950 outline-none transition focus:border-sky-500 disabled:cursor-not-allowed disabled:bg-slate-100"
-                        >
-                          <option value="TODO">TODO</option>
-                          <option value="IN_PROGRESS">IN_PROGRESS</option>
-                          <option value="DONE">DONE</option>
-                        </select>
-                      </td>
-                    </tr>
-                  );
-                })
+                tasks.map((task) => (
+                  <tr key={task.id}>
+                    <td className="px-6 py-4 text-sm font-medium text-slate-900">
+                      {task.title}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-slate-700">
+                      <select
+                        value={draftStatuses[task.id] ?? getTaskStatus(task)}
+                        onChange={(event) =>
+                          handleStatusUpdate(
+                            task.id,
+                            event.target.value as NonNullable<TaskStatus>,
+                          )
+                        }
+                        disabled={isUpdating}
+                        className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-950 outline-none transition focus:border-sky-500 disabled:cursor-not-allowed disabled:bg-slate-100"
+                      >
+                        <option value="TODO">TODO</option>
+                        <option value="IN_PROGRESS">IN_PROGRESS</option>
+                        <option value="DONE">DONE</option>
+                      </select>
+                    </td>
+                  </tr>
+                ))
               )}
             </tbody>
           </table>
         </div>
 
-        {isFetching && !isLoading ? (
+        {isFetching ? (
           <div className="border-t border-slate-200 px-6 py-3 text-xs text-slate-500">
             Refreshing task data...
           </div>

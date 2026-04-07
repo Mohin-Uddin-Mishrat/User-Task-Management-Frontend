@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { getApiMessage } from "@/lib/api";
 import { useGetUsersQuery } from "@/redux/api/authApi";
 import {
   useCreateTaskMutation,
@@ -24,18 +25,6 @@ type FormState = {
   assigneeId: string;
 };
 
-function getErrorMessage(error: unknown, fallback: string) {
-  return typeof error === "object" &&
-    error !== null &&
-    "data" in error &&
-    typeof error.data === "object" &&
-    error.data !== null &&
-    "message" in error.data &&
-    typeof error.data.message === "string"
-    ? error.data.message
-    : fallback;
-}
-
 export function TaskModal({
   isOpen,
   mode,
@@ -47,7 +36,7 @@ export function TaskModal({
     title: initialValues?.title ?? "",
     assigneeId: initialValues?.assigneeId ?? "",
   });
-  const [localError, setLocalError] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [createTask, { isLoading: isCreating }] = useCreateTaskMutation();
   const [updateTask, { isLoading: isUpdating }] = useUpdateTaskMutation();
   const { data: usersResponse, isLoading: isLoadingUsers } = useGetUsersQuery(
@@ -57,12 +46,20 @@ export function TaskModal({
     },
   );
 
+  if (!isOpen) {
+    return null;
+  }
+
+  const isAddMode = mode === "add";
+  const isSubmitting = isCreating || isUpdating;
+  const users = usersResponse?.data ?? [];
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setLocalError(null);
+    setErrorMessage(null);
 
     try {
-      if (mode === "add") {
+      if (isAddMode) {
         const response = await createTask({
           title: form.title,
           assigneeId: form.assigneeId,
@@ -75,7 +72,7 @@ export function TaskModal({
       }
 
       if (!initialValues?.id) {
-        setLocalError("Task id is missing.");
+        setErrorMessage("Task id is missing.");
         return;
       }
 
@@ -87,22 +84,14 @@ export function TaskModal({
       onSuccess(response.message ?? "Task updated successfully.");
       onClose();
     } catch (error) {
-      setLocalError(
-        getErrorMessage(
+      setErrorMessage(
+        getApiMessage(
           error,
-          mode === "add" ? "Task creation failed." : "Task update failed.",
+          isAddMode ? "Task creation failed." : "Task update failed.",
         ),
       );
     }
   }
-
-  if (!isOpen) {
-    return null;
-  }
-
-  const isAddMode = mode === "add";
-  const isSubmitting = isCreating || isUpdating;
-  const users = usersResponse?.data ?? [];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4">
@@ -118,7 +107,7 @@ export function TaskModal({
             <p className="mt-3 text-sm leading-6 text-slate-600">
               {isAddMode
                 ? "Create a task here. New tasks use TODO status by default."
-                : "Edit the task title here. Status is no longer part of this form."}
+                : "Edit the task title here."}
             </p>
           </div>
 
@@ -180,9 +169,9 @@ export function TaskModal({
             </label>
           ) : null}
 
-          {localError ? (
+          {errorMessage ? (
             <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-800">
-              {localError}
+              {errorMessage}
             </p>
           ) : null}
 

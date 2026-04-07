@@ -1,4 +1,5 @@
 import { createApi } from "@reduxjs/toolkit/query/react";
+import type { AuthResponseData, UserOption } from "@/lib/auth-token";
 import { createBaseQuery } from "./baseQuery";
 import { getApiBaseUrl } from "./apiBaseUrl";
 
@@ -8,28 +9,10 @@ export type LoginRequest = {
 };
 
 export type LoginResponse = {
+  statusCode: number;
+  success: boolean;
   message?: string;
-  token?: string;
-  accessToken?: string;
-  role?: string;
-  user?: {
-    role?: string;
-    email?: string;
-  };
-  data?: {
-    token?: string;
-    accessToken?: string;
-    role?: string;
-    user?: {
-      role?: string;
-      email?: string;
-    };
-  };
-};
-
-export type UserOption = {
-  id: string;
-  name: string;
+  data: AuthResponseData;
 };
 
 export type GetUsersResponse = {

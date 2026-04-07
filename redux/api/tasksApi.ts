@@ -1,4 +1,5 @@
 import { createApi } from "@reduxjs/toolkit/query/react";
+import type { PaginatedResponse } from "@/lib/api";
 import { getApiBaseUrl } from "./apiBaseUrl";
 import { createBaseQuery } from "./baseQuery";
 
@@ -41,40 +42,14 @@ export type GetTasksRequest = {
   status?: TaskStatus;
 };
 
-export type GetTasksResponse = {
-  statusCode: number;
-  success: boolean;
-  message: string;
-  data: {
-    meta: {
-      page: number;
-      limit: number;
-      total: number;
-      totalPage: number;
-    };
-    data: TaskRecord[];
-  };
-};
+export type GetTasksResponse = PaginatedResponse<TaskRecord>;
 
 export type GetMyTasksRequest = {
   page?: number;
   limit?: number;
 };
 
-export type GetMyTasksResponse = {
-  statusCode: number;
-  success: boolean;
-  message: string;
-  data: {
-    meta: {
-      page: number;
-      limit: number;
-      total: number;
-      totalPage: number;
-    };
-    data: TaskRecord[];
-  };
-};
+export type GetMyTasksResponse = PaginatedResponse<TaskRecord>;
 
 export type UpdateTaskRequest = {
   id: string;
@@ -118,20 +93,15 @@ export type GetTaskLogsRequest = {
   limit?: number;
 };
 
-export type GetTaskLogsResponse = {
-  statusCode: number;
-  success: boolean;
-  message: string;
-  data: {
-    meta: {
-      page: number;
-      limit: number;
-      total: number;
-      totalPage: number;
-    };
-    data: TaskLogRecord[];
-  };
-};
+export type GetTaskLogsResponse = PaginatedResponse<TaskLogRecord>;
+
+const taskListTag = { type: "Task" as const, id: "LIST" };
+
+function provideTaskList(result?: PaginatedResponse<TaskRecord>) {
+  return result
+    ? [...result.data.data.map((task) => ({ type: "Task" as const, id: task.id })), taskListTag]
+    : [taskListTag];
+}
 
 export const tasksApi = createApi({
   reducerPath: "tasksApi",
@@ -149,16 +119,7 @@ export const tasksApi = createApi({
           ...(params?.status ? { status: params.status } : {}),
         },
       }),
-      providesTags: (result) =>
-        result
-          ? [
-              ...result.data.data.map((task) => ({
-                type: "Task" as const,
-                id: task.id,
-              })),
-              { type: "Task" as const, id: "LIST" },
-            ]
-          : [{ type: "Task" as const, id: "LIST" }],
+      providesTags: provideTaskList,
     }),
     getMyTasks: builder.query<GetMyTasksResponse, GetMyTasksRequest | void>({
       query: (params) => ({
@@ -168,16 +129,7 @@ export const tasksApi = createApi({
           limit: params?.limit ?? 10,
         },
       }),
-      providesTags: (result) =>
-        result
-          ? [
-              ...result.data.data.map((task) => ({
-                type: "Task" as const,
-                id: task.id,
-              })),
-              { type: "Task" as const, id: "LIST" },
-            ]
-          : [{ type: "Task" as const, id: "LIST" }],
+      providesTags: provideTaskList,
     }),
     createTask: builder.mutation<CreateTaskResponse, CreateTaskRequest>({
       query: (body) => ({
@@ -185,7 +137,7 @@ export const tasksApi = createApi({
         method: "POST",
         body,
       }),
-      invalidatesTags: [{ type: "Task", id: "LIST" }],
+      invalidatesTags: [taskListTag],
     }),
     updateTask: builder.mutation<UpdateTaskResponse, UpdateTaskRequest>({
       query: ({ id, ...body }) => ({
@@ -193,10 +145,7 @@ export const tasksApi = createApi({
         method: "PATCH",
         body,
       }),
-      invalidatesTags: (_result, _error, arg) => [
-        { type: "Task", id: arg.id },
-        { type: "Task", id: "LIST" },
-      ],
+      invalidatesTags: [taskListTag],
     }),
     updateTaskStatus: builder.mutation<
       UpdateTaskStatusResponse,
@@ -207,20 +156,14 @@ export const tasksApi = createApi({
         method: "PATCH",
         body,
       }),
-      invalidatesTags: (_result, _error, arg) => [
-        { type: "Task", id: arg.id },
-        { type: "Task", id: "LIST" },
-      ],
+      invalidatesTags: [taskListTag],
     }),
     deleteTask: builder.mutation<DeleteTaskResponse, string>({
       query: (id) => ({
         url: `/tasks/${id}`,
         method: "DELETE",
       }),
-      invalidatesTags: (_result, _error, id) => [
-        { type: "Task", id },
-        { type: "Task", id: "LIST" },
-      ],
+      invalidatesTags: [taskListTag],
     }),
     getTaskLogs: builder.query<GetTaskLogsResponse, GetTaskLogsRequest | void>({
       query: (params) => ({

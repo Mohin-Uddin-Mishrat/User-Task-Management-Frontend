@@ -7,6 +7,24 @@ export type DecodedAuthToken = {
   exp?: number;
 };
 
+export type AuthUser = {
+  id: string;
+  email: string;
+  name: string;
+  role: DecodedAuthToken["role"];
+};
+
+export type UserOption = {
+  id: string;
+  name: string;
+};
+
+export type AuthResponseData = {
+  user: AuthUser;
+  accessToken: string;
+  refreshToken?: string;
+};
+
 const AUTH_TOKEN_STORAGE_KEY = "task-manager-auth-token";
 
 function normalizeRole(role: unknown): "ADMIN" | "USER" {
@@ -59,21 +77,12 @@ export function decodeAuthToken(token: string): DecodedAuthToken | null {
   }
 }
 
-export function extractTokenFromResponse(response: {
-  token?: string;
-  accessToken?: string;
-  data?: {
-    token?: string;
-    accessToken?: string;
-  };
-}) {
-  return (
-    response.accessToken ??
-    response.token ??
-    response.data?.accessToken ??
-    response.data?.token ??
-    null
-  );
+export function extractTokenFromResponse(response: { data?: AuthResponseData }) {
+  return response.data?.accessToken ?? null;
+}
+
+export function extractUserFromResponse(response: { data?: AuthResponseData }) {
+  return response.data?.user ?? null;
 }
 
 export function persistAuthToken(token: string) {
@@ -88,38 +97,10 @@ export function clearPersistedAuthToken() {
   window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
 }
 
-function getCookieToken() {
-  const possibleCookieNames = [
-    "accessToken",
-    "token",
-    "authToken",
-    "jwt",
-    "refreshToken",
-  ];
-
-  const cookies = document.cookie.split(";").map((cookie) => cookie.trim());
-
-  for (const name of possibleCookieNames) {
-    const matchedCookie = cookies.find((cookie) => cookie.startsWith(`${name}=`));
-
-    if (matchedCookie) {
-      return decodeURIComponent(matchedCookie.slice(name.length + 1));
-    }
-  }
-
-  return null;
-}
-
 export function getStoredAuthToken() {
   if (typeof window === "undefined") {
     return null;
   }
 
-  const localToken = window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
-
-  if (localToken) {
-    return localToken;
-  }
-
-  return getCookieToken();
+  return window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
 }

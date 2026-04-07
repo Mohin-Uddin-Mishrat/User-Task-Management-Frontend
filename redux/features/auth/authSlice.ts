@@ -1,21 +1,20 @@
 import { createSlice } from "@reduxjs/toolkit";
+import type { AuthUser, DecodedAuthToken } from "@/lib/auth-token";
 import { authApi } from "@/redux/api/authApi";
 
 type AuthState = {
   isAuthenticated: boolean;
   isHydrated: boolean;
-  userId: string | null;
-  userName: string | null;
   userEmail: string | null;
-  role: "ADMIN" | "USER" | null;
+  userName: string | null;
+  role: DecodedAuthToken["role"] | null;
 };
 
 const initialState: AuthState = {
   isAuthenticated: false,
   isHydrated: false,
-  userId: null,
-  userName: null,
   userEmail: null,
+  userName: null,
   role: null,
 };
 
@@ -26,60 +25,41 @@ const authSlice = createSlice({
     hydrateAuthState: (
       state,
       action: {
-        payload:
-          | {
-              id: string;
-              email: string;
-              role: "ADMIN" | "USER";
-              name?: string;
-            }
-          | null;
+        payload: DecodedAuthToken | null;
       },
     ) => {
       state.isHydrated = true;
 
       if (!action.payload) {
         state.isAuthenticated = false;
-        state.userId = null;
-        state.userName = null;
         state.userEmail = null;
+        state.userName = null;
         state.role = null;
         return;
       }
 
       state.isAuthenticated = true;
-      state.userId = action.payload.id;
-      state.userName = action.payload.name ?? null;
       state.userEmail = action.payload.email;
+      state.userName = action.payload.name ?? null;
       state.role = action.payload.role;
     },
     logoutLocal: (state) => {
       state.isAuthenticated = false;
       state.isHydrated = true;
-      state.userId = null;
-      state.userName = null;
       state.userEmail = null;
+      state.userName = null;
       state.role = null;
     },
   },
   extraReducers: (builder) => {
     builder.addMatcher(authApi.endpoints.login.matchFulfilled, (state, action) => {
-      const response = action.payload;
-      const detectedRole =
-        response.role ??
-        response.user?.role ??
-        response.data?.role ??
-        response.data?.user?.role;
+      const user = action.payload.data.user as AuthUser;
 
       state.isAuthenticated = true;
       state.isHydrated = true;
-      state.userId = null;
-      state.userName = null;
-      state.userEmail =
-        response.user?.email ??
-        response.data?.user?.email ??
-        action.meta.arg.originalArgs.email;
-      state.role = detectedRole === "ADMIN" ? "ADMIN" : "USER";
+      state.userEmail = user.email;
+      state.userName = user.name;
+      state.role = user.role;
     });
   },
 });

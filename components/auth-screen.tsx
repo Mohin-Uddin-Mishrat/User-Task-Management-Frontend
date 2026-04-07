@@ -1,8 +1,13 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { getApiMessage } from "@/lib/api";
 import { useRouter } from "next/navigation";
-import { extractTokenFromResponse, persistAuthToken } from "@/lib/auth-token";
+import {
+  extractTokenFromResponse,
+  extractUserFromResponse,
+  persistAuthToken,
+} from "@/lib/auth-token";
 import { useLoginMutation } from "@/redux/api/authApi";
 import { useAppSelector } from "@/redux/hooks";
 
@@ -29,12 +34,7 @@ export function AuthScreen() {
     try {
       const response = await login({ email, password }).unwrap();
       const token = extractTokenFromResponse(response);
-      const nextRole =
-        response.role ??
-        response.user?.role ??
-        response.data?.role ??
-        response.data?.user?.role ??
-        "USER";
+      const user = extractUserFromResponse(response);
 
       if (token) {
         persistAuthToken(token);
@@ -42,21 +42,15 @@ export function AuthScreen() {
 
       setFeedback(
         response.message ??
-          `Login successful. Redirecting to the ${nextRole.toLowerCase()} dashboard...`,
+          `Login successful. Redirecting to the ${(user?.role ?? "USER").toLowerCase()} dashboard...`,
       );
     } catch (error) {
-      const message =
-        typeof error === "object" &&
-        error !== null &&
-        "data" in error &&
-        typeof error.data === "object" &&
-        error.data !== null &&
-        "message" in error.data &&
-        typeof error.data.message === "string"
-          ? error.data.message
-          : "Login failed. Please check your credentials and try again.";
-
-      setFeedback(message);
+      setFeedback(
+        getApiMessage(
+          error,
+          "Login failed. Please check your credentials and try again.",
+        ),
+      );
     }
   }
 
@@ -122,7 +116,6 @@ export function AuthScreen() {
           >
             {isLoggingIn ? "Signing in..." : "Sign in"}
           </button>
-
         </div>
       </form>
 
